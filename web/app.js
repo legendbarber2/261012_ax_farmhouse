@@ -338,7 +338,7 @@ async function loadSessions() {
 
 function sessionStatusLabel(status) {
   return ({
-    completed: "완료",
+    completed: "수집 완료",
     recording: "수집 중",
     interrupted: "중단",
     partial: "일부 누락",
