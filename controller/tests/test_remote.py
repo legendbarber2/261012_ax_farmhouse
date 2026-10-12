@@ -1,6 +1,12 @@
 import pytest
 
-from controller.remote import SSHFarmClient, decode_image_id, encode_image_id, validate_image_path
+from controller.remote import (
+    SSHFarmClient,
+    decode_image_id,
+    encode_image_id,
+    validate_image_path,
+    validate_session_id,
+)
 from controller.settings import FarmSettings, SSHSettings
 
 
@@ -34,3 +40,22 @@ def test_preview_rejects_unknown_camera():
     )
     with pytest.raises(ValueError):
         client.preview(farm, "CAM99")
+
+
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "../../etc/passwd",
+        "S20261012T204458Z",
+        "X20261012T204458Z-FC7E5475",
+        "S20261012T204458Z-bad-lowercase",
+    ],
+)
+def test_session_id_rejects_unsafe_values(session_id):
+    with pytest.raises(ValueError):
+        validate_session_id(session_id)
+
+
+def test_session_id_accepts_farm_work_and_crop_ids():
+    validate_session_id("S20261012T204458Z-FC7E5475")
+    validate_session_id("C20261012T030000Z-ABCD1234")

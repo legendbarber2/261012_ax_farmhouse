@@ -2,9 +2,11 @@ const state = {
   apiBaseUrl: "",
   farms: [],
   selectedFarmId: null,
-  imageOffset: 0,
-  imageLimit: 24,
-  imageTotal: 0,
+  sessionOffset: 0,
+  sessionLimit: 8,
+  sessionTotal: 0,
+  currentSessions: [],
+  sessionImages: new Map(),
   ptzPreviewObjectUrl: null,
   refreshTimer: null,
 };
@@ -117,6 +119,17 @@ function dateTime(value, fromEpoch = false) {
   }).format(date);
 }
 
+function duration(value) {
+  if (!Number.isFinite(value)) return "진행 중";
+  const seconds = Math.max(0, Math.round(value));
+  if (seconds < 60) return `${seconds}초`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (minutes < 60) return remainder ? `${minutes}분 ${remainder}초` : `${minutes}분`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}시간 ${minutes % 60}분`;
+}
+
 function toast(message, type = "success") {
   const node = document.createElement("div");
   node.className = `toast ${type}`;
@@ -187,7 +200,8 @@ function updateFarmSelect() {
 
 function selectFarm(farmId) {
   state.selectedFarmId = farmId;
-  state.imageOffset = 0;
+  state.sessionOffset = 0;
+  state.sessionImages.clear();
   const farm = state.farms.find((item) => item.id === farmId);
   if (!farm) return;
   elements.workspace.classList.remove("hidden");
@@ -202,7 +216,7 @@ function selectFarm(farmId) {
     button.disabled = !farm.ptz_enabled;
   });
   renderFarms();
-  loadImages();
+  loadSessions();
   loadPtzPreview();
 }
 
@@ -280,7 +294,7 @@ async function runAction(action) {
     if (result.status === "succeeded") {
       toast(`${farm.name}: 작업이 완료됐습니다.`);
       await loadDashboard({ quiet: true });
-      if (action === "capture") await loadImages();
+      if (action === "capture") await loadSessions();
     } else {
       toast(`${farm.name}: ${result.error}`, "error");
     }
@@ -300,50 +314,178 @@ async function waitForJob(jobId) {
   throw new Error("작업 완료 대기 시간이 초과됐습니다.");
 }
 
-async function loadImages() {
+async function loadSessions() {
   if (!state.selectedFarmId) return;
-  elements.imageGrid.innerHTML = '<div class="empty-card">이미지를 조회하고 있습니다…</div>';
-  const params = new URLSearchParams({ limit: state.imageLimit, offset: state.imageOffset });
+  elements.imageGrid.innerHTML = '<div class="empty-card">촬영 세션을 조회하고 있습니다…</div>';
+  const params = new URLSearchParams({ limit: state.sessionLimit, offset: state.sessionOffset });
   if (elements.imageType.value) params.set("data_type", elements.imageType.value);
   if (elements.imageCamera.value) params.set("camera", elements.imageCamera.value);
   try {
-    const payload = await fetchApi(`/api/farms/${state.selectedFarmId}/images?${params}`);
-    state.imageTotal = payload.total;
-    renderImages(payload.items);
-    const start = payload.total ? state.imageOffset + 1 : 0;
-    const end = Math.min(state.imageOffset + state.imageLimit, payload.total);
-    elements.imagePage.textContent = `${start}–${end} / ${payload.total}`;
-    elements.previousImages.disabled = state.imageOffset === 0;
-    elements.nextImages.disabled = state.imageOffset + state.imageLimit >= payload.total;
+    const payload = await fetchApi(`/api/farms/${state.selectedFarmId}/sessions?${params}`);
+    state.sessionTotal = payload.total;
+    state.currentSessions = payload.items;
+    state.sessionImages.clear();
+    renderSessions(payload.items);
+    const start = payload.total ? state.sessionOffset + 1 : 0;
+    const end = Math.min(state.sessionOffset + state.sessionLimit, payload.total);
+    elements.imagePage.textContent = `세션 ${start}–${end} / ${payload.total}`;
+    elements.previousImages.disabled = state.sessionOffset === 0;
+    elements.nextImages.disabled = state.sessionOffset + state.sessionLimit >= payload.total;
   } catch (error) {
     elements.imageGrid.innerHTML = `<div class="empty-card">${escapeHtml(error.message)}</div>`;
   }
 }
 
-function renderImages(items) {
-  if (!items.length) {
-    elements.imageGrid.innerHTML = '<div class="empty-card">조건에 맞는 저장 이미지가 없습니다.</div>';
-    return;
-  }
-  elements.imageGrid.innerHTML = items.map((item) => {
-    const src = apiUrl(item.url);
-    const typeLabel = item.data_type === "crop" ? "작물" : "농작업";
-    return `
-      <article class="image-card" data-image-id="${escapeHtml(item.id)}" tabindex="0">
-        <img src="${escapeHtml(src)}" alt="${escapeHtml(item.camera_id)} ${typeLabel} 이미지" loading="lazy" />
-        <div class="image-card-body">
-          <div><strong>${escapeHtml(item.camera_id || "CAM")}</strong><small>${dateTime(item.captured_at, true)} · ${bytes(item.size_bytes)}</small></div>
-          <span class="image-tag">${typeLabel}</span>
-        </div>
-      </article>`;
-  }).join("");
-  elements.imageGrid.querySelectorAll(".image-card").forEach((card, index) => {
+function sessionStatusLabel(status) {
+  return ({
+    completed: "완료",
+    recording: "수집 중",
+    interrupted: "중단",
+    partial: "일부 누락",
+  })[status] || "확인 필요";
+}
+
+function reviewLabel(flags) {
+  const labels = [];
+  if (flags.includes("missing_camera")) labels.push("카메라 누락");
+  if (flags.includes("no_start_detection")) labels.push("시작 감지 기록 없음");
+  if (flags.includes("incomplete")) labels.push("미완료");
+  return labels.join(" · ");
+}
+
+function imageCard(item, typeLabel) {
+  const detected = item.person_detected ? '<span class="detection-badge">사람 감지</span>' : "";
+  return `
+    <article class="image-card" data-image-id="${escapeHtml(item.id)}" tabindex="0">
+      <div class="image-frame">
+        <img src="${escapeHtml(apiUrl(item.url))}" alt="${escapeHtml(item.camera_id)} ${typeLabel} 이미지" loading="lazy" />
+        ${detected}
+      </div>
+      <div class="image-card-body">
+        <div><strong>${escapeHtml(item.camera_id || "CAM")}</strong><small>${dateTime(item.captured_at, true)} · ${bytes(item.size_bytes)}</small></div>
+        <span class="image-tag">${typeLabel}</span>
+      </div>
+    </article>`;
+}
+
+function bindImageCards(container, items) {
+  container.querySelectorAll(".image-card").forEach((card, index) => {
     const open = () => openImage(items[index]);
     card.addEventListener("click", open);
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") open();
     });
   });
+}
+
+function renderSessions(sessions) {
+  if (!sessions.length) {
+    elements.imageGrid.innerHTML = '<div class="empty-card">조건에 맞는 촬영 세션이 없습니다.</div>';
+    return;
+  }
+
+  elements.imageGrid.innerHTML = sessions.map((session, sessionIndex) => {
+    const typeLabel = session.data_type === "crop" ? "작물 정기 촬영" : "농작업";
+    const triggerText = session.trigger_cameras.length
+      ? `시작 감지 ${session.trigger_cameras.join(", ")}`
+      : "시작 감지 기록 없음";
+    const warning = reviewLabel(session.review_flags);
+    const statusClass = session.review_flags.length ? "warning" : session.status;
+    const cameraSummary = session.cameras.map((camera) => `
+      <div class="session-camera ${camera.capture_count ? "" : "missing"}">
+        <strong>${escapeHtml(camera.camera_id)}</strong>
+        <span>${camera.capture_count}장</span>
+        <small>${camera.started_with_person ? "시작 감지" : camera.status === "missing" ? "기록 없음" : "동시 촬영"}</small>
+      </div>`).join("");
+    const representatives = session.representatives.map((item) => imageCard(item, typeLabel)).join("");
+    return `
+      <article class="session-card" data-session-index="${sessionIndex}">
+        <header class="session-header">
+          <div>
+            <div class="session-title-row">
+              <span class="image-tag">${typeLabel}</span>
+              <span class="session-status ${statusClass}">${sessionStatusLabel(session.status)}</span>
+            </div>
+            <h3>${dateTime(session.started_at)}</h3>
+            <p>${escapeHtml(session.session_id)}</p>
+          </div>
+          <div class="session-metrics">
+            <span><strong>${session.capture_count}</strong>장</span>
+            <span><strong>${duration(session.duration_seconds)}</strong>지속</span>
+            <span class="${session.trigger_cameras.length ? "detected" : "warning-text"}">${escapeHtml(triggerText)}</span>
+          </div>
+        </header>
+        ${warning ? `<p class="session-warning">⚠ ${escapeHtml(warning)}</p>` : ""}
+        <div class="session-camera-grid">${cameraSummary}</div>
+        <div class="session-representatives">${representatives || '<div class="empty-card">대표 이미지가 없습니다.</div>'}</div>
+        <div class="session-actions">
+          <span>각 카메라의 세션 시작 이미지를 표시합니다.</span>
+          <button class="text-button secondary session-toggle" type="button">세션 전체 이미지 보기</button>
+        </div>
+        <div class="session-detail hidden"></div>
+      </article>`;
+  }).join("");
+
+  elements.imageGrid.querySelectorAll(".session-card").forEach((card, sessionIndex) => {
+    const session = sessions[sessionIndex];
+    bindImageCards(card.querySelector(".session-representatives"), session.representatives);
+    card.querySelector(".session-toggle").addEventListener("click", () => toggleSession(card, session));
+  });
+}
+
+async function toggleSession(card, session) {
+  const detail = card.querySelector(".session-detail");
+  const button = card.querySelector(".session-toggle");
+  if (!detail.classList.contains("hidden")) {
+    detail.classList.add("hidden");
+    button.textContent = "세션 전체 이미지 보기";
+    return;
+  }
+  detail.classList.remove("hidden");
+  button.textContent = "세션 이미지 접기";
+  const key = `${session.data_type}:${session.session_id}:${elements.imageCamera.value}`;
+  const cached = state.sessionImages.get(key);
+  if (cached) {
+    renderSessionImages(detail, session, cached);
+    return;
+  }
+  detail.innerHTML = '<div class="empty-card">이 세션의 이미지를 불러오고 있습니다…</div>';
+  await loadSessionImages(detail, session, key, false);
+}
+
+async function loadSessionImages(detail, session, key, append) {
+  const current = append ? (state.sessionImages.get(key)?.items || []) : [];
+  const params = new URLSearchParams({ data_type: session.data_type, limit: 60, offset: current.length });
+  if (elements.imageCamera.value) params.set("camera", elements.imageCamera.value);
+  try {
+    const payload = await fetchApi(
+      `/api/farms/${state.selectedFarmId}/sessions/${encodeURIComponent(session.session_id)}/images?${params}`,
+    );
+    const value = { total: payload.total, items: [...current, ...payload.items] };
+    state.sessionImages.set(key, value);
+    renderSessionImages(detail, session, value);
+  } catch (error) {
+    detail.innerHTML = `<div class="empty-card">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderSessionImages(detail, session, value) {
+  const typeLabel = session.data_type === "crop" ? "작물" : "농작업";
+  detail.innerHTML = `
+    <div class="session-detail-heading">
+      <div><strong>세션 전체 이미지</strong><small>${value.items.length} / ${value.total}장</small></div>
+    </div>
+    <div class="session-image-grid">${value.items.map((item) => imageCard(item, typeLabel)).join("")}</div>
+    ${value.items.length < value.total ? '<button class="text-button secondary session-more" type="button">이미지 더 보기</button>' : ""}`;
+  bindImageCards(detail.querySelector(".session-image-grid"), value.items);
+  const more = detail.querySelector(".session-more");
+  if (more) {
+    const key = `${session.data_type}:${session.session_id}:${elements.imageCamera.value}`;
+    more.addEventListener("click", async () => {
+      more.disabled = true;
+      await loadSessionImages(detail, session, key, true);
+    });
+  }
 }
 
 function openImage(item) {
@@ -412,9 +554,9 @@ document.querySelectorAll("[data-action]").forEach((button) => button.addEventLi
 document.querySelectorAll(".ptz-pad button").forEach((button) => button.addEventListener("click", () => moveCamera(button.dataset.direction)));
 elements.ptzCamera.addEventListener("change", loadPtzPreview);
 elements.refreshPtzPreview.addEventListener("click", loadPtzPreview);
-elements.loadImagesButton.addEventListener("click", () => { state.imageOffset = 0; loadImages(); });
-elements.previousImages.addEventListener("click", () => { state.imageOffset = Math.max(0, state.imageOffset - state.imageLimit); loadImages(); });
-elements.nextImages.addEventListener("click", () => { state.imageOffset += state.imageLimit; loadImages(); });
+elements.loadImagesButton.addEventListener("click", () => { state.sessionOffset = 0; loadSessions(); });
+elements.previousImages.addEventListener("click", () => { state.sessionOffset = Math.max(0, state.sessionOffset - state.sessionLimit); loadSessions(); });
+elements.nextImages.addEventListener("click", () => { state.sessionOffset += state.sessionLimit; loadSessions(); });
 elements.loadLogsButton.addEventListener("click", loadLogs);
 elements.closeImageDialog.addEventListener("click", () => elements.imageDialog.close());
 

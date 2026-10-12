@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#07110d" />
     <title>AX Farmhouse Control</title>
-    <link rel="stylesheet" href="./styles.css?v=20261012-2" />
+    <link rel="stylesheet" href="./styles.css?v=20261013-1" />
   </head>
   <body>
     <div class="ambient ambient-one"></div>
@@ -173,13 +173,13 @@
       <section id="gallerySection" class="section-block hidden" aria-labelledby="galleryHeading">
         <div class="section-heading gallery-heading">
           <div>
-            <p class="eyebrow">IMAGE ARCHIVE</p>
-            <h2 id="galleryHeading">저장 이미지</h2>
+            <p class="eyebrow">SESSION ARCHIVE</p>
+            <h2 id="galleryHeading">촬영 세션</h2>
           </div>
           <div class="filter-row">
             <select id="imageType" aria-label="이미지 종류">
               <option value="">전체 촬영</option>
-              <option value="farm_work">농작업</option>
+              <option value="farm_work" selected>농작업</option>
               <option value="crop">작물 정기 촬영</option>
             </select>
             <select id="imageCamera" aria-label="카메라">
@@ -189,7 +189,7 @@
             <button id="loadImagesButton" class="text-button" type="button">조회</button>
           </div>
         </div>
-        <div id="imageGrid" class="image-grid"></div>
+        <div id="imageGrid" class="session-list"></div>
         <div class="pagination">
           <button id="previousImages" type="button">이전</button>
           <span id="imagePage">—</span>
@@ -243,7 +243,7 @@
 
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
 
-    <script src="./config.js?v=20261012-2"></script>
-    <script src="./app.js?v=20261012-2" defer></script>
+    <script src="./config.js?v=20261013-1"></script>
+    <script src="./app.js?v=20261013-1" defer></script>
   </body>
 </html>

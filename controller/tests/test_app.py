@@ -18,6 +18,34 @@ class FakeRemote:
     def list_images(self, farm, **kwargs):
         return {"total": 0, "items": []}
 
+    def list_sessions(self, farm, **kwargs):
+        return {
+            "total": 1,
+            "items": [
+                {
+                    "session_id": "S20261012T204458Z-FC7E5475",
+                    "data_type": "farm_work",
+                    "representatives": [
+                        {
+                            "id": "encoded-image",
+                            "camera_id": "CAM01",
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def list_session_images(self, farm, **kwargs):
+        return {
+            "total": 1,
+            "items": [
+                {
+                    "id": "encoded-image",
+                    "camera_id": "CAM01",
+                }
+            ],
+        }
+
     def preview(self, farm, camera):
         return b"\xff\xd8preview\xff\xd9"
 
@@ -66,3 +94,28 @@ def test_camera_preview_returns_uncached_jpeg():
     assert response.headers["content-type"] == "image/jpeg"
     assert response.headers["cache-control"] == "no-store"
     assert response.content == b"\xff\xd8preview\xff\xd9"
+
+
+def test_session_list_adds_representative_image_urls():
+    client = TestClient(create_app(settings(), FakeRemote()))
+    response = client.get("/api/farms/ha/sessions?data_type=farm_work")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["representatives"][0]["url"] == (
+        "/api/farms/ha/images/encoded-image"
+    )
+
+
+def test_session_detail_adds_image_urls():
+    client = TestClient(create_app(settings(), FakeRemote()))
+    response = client.get(
+        "/api/farms/ha/sessions/S20261012T204458Z-FC7E5475/images"
+        "?data_type=farm_work"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session_id"] == "S20261012T204458Z-FC7E5475"
+    assert payload["items"][0]["url"] == "/api/farms/ha/images/encoded-image"

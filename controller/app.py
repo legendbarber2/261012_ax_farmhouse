@@ -232,6 +232,71 @@ def create_app(
         payload.update({"farm_id": farm.id, "limit": limit, "offset": offset})
         return payload
 
+    @app.get("/api/farms/{farm_id}/sessions")
+    def sessions(
+        farm_id: str,
+        camera: Literal["CAM01", "CAM02", "CAM03"] | None = None,
+        data_type: Literal["farm_work", "crop"] | None = None,
+        limit: int = Query(default=8, ge=1, le=50),
+        offset: int = Query(default=0, ge=0),
+        user: str = Depends(require_user),
+    ) -> dict[str, Any]:
+        del user
+        farm = farm_or_404(farm_id)
+        try:
+            payload = client.list_sessions(
+                farm,
+                camera=camera,
+                data_type=data_type,
+                limit=limit,
+                offset=offset,
+            )
+        except (RemoteError, ValueError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        for session in payload["items"]:
+            for item in session["representatives"]:
+                item["url"] = f"/api/farms/{farm.id}/images/{item['id']}"
+        payload.update({"farm_id": farm.id, "limit": limit, "offset": offset})
+        return payload
+
+    @app.get("/api/farms/{farm_id}/sessions/{session_id}/images")
+    def session_images(
+        farm_id: str,
+        session_id: str,
+        data_type: Literal["farm_work", "crop"],
+        camera: Literal["CAM01", "CAM02", "CAM03"] | None = None,
+        limit: int = Query(default=60, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+        user: str = Depends(require_user),
+    ) -> dict[str, Any]:
+        del user
+        farm = farm_or_404(farm_id)
+        try:
+            payload = client.list_session_images(
+                farm,
+                session_id=session_id,
+                data_type=data_type,
+                camera=camera,
+                limit=limit,
+                offset=offset,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RemoteError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        for item in payload["items"]:
+            item["url"] = f"/api/farms/{farm.id}/images/{item['id']}"
+        payload.update(
+            {
+                "farm_id": farm.id,
+                "session_id": session_id,
+                "data_type": data_type,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        return payload
+
     @app.get("/api/farms/{farm_id}/preview")
     def preview(
         farm_id: str,
