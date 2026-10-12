@@ -8,7 +8,7 @@
 GitHub Pages 정적 화면
         │ HTTPS (브라우저가 Tailnet에 연결된 경우에만 접근)
         ▼
-Tailscale Serve → 127.0.0.1:8765 중앙 제어 API
+작업 노트북 Tailscale Serve → 127.0.0.1:8765 제어 API
         │ SSH (전용 키, 허용된 명령만 실행)
         ├── GH 농가 PC
         ├── GJ 농가 PC
@@ -18,8 +18,8 @@ Tailscale Serve → 127.0.0.1:8765 중앙 제어 API
 ```
 
 - `web/`: GitHub Pages에 배포되는 정적 화면
-- `controller/`: 하둡 서버에서 실행할 FastAPI 중앙 제어 API
-- `scripts/install-controller.sh`: API systemd 서비스 설치
+- `controller/`: 작업 노트북에서 실행할 FastAPI 제어 API
+- `scripts/install-laptop-controller.sh`: 작업 노트북 user systemd 서비스 설치
 - `.github/workflows/pages.yml`: `main` 푸시 시 Pages 자동 배포
 
 GitHub Pages에는 SSH 키, CCTV 계정, RTSP 주소를 넣지 않습니다. API는 `127.0.0.1`에만 바인딩하고 Tailscale Serve를 통해서만 공개합니다. Tailscale Serve는 Tailnet 요청자의 신원 헤더를 백엔드에 전달하며, API는 이 헤더로 접근자를 확인합니다.
@@ -44,9 +44,9 @@ python3 -m http.server 8080 --directory web
 
 브라우저에서 `http://127.0.0.1:8080`을 엽니다. 실제 API 연결 전에도 화면 배치를 확인할 수 있습니다.
 
-## 중앙 제어 API 준비
+## 작업 노트북 제어 API 준비
 
-하둡 서버에 이 저장소를 복제한 뒤 진행합니다.
+하둡 서버에는 제어 프로그램을 설치하지 않습니다. 농가 PC 접속용 SSH 키와 Tailscale이 이미 설정된 작업 노트북에서 진행합니다.
 
 ```bash
 cp controller/config.example.json controller/config.json
@@ -61,19 +61,10 @@ chmod 600 controller/config.json
 - 농가별 Tailscale IP, 사용자, 프로젝트 경로
 - `ptz_enabled`: 장치 제어 검증 전에는 반드시 `false`
 
-중앙 제어 전용 키는 하둡 서버에서 새로 만듭니다.
+`ssh.identity_file`에는 이미 각 농가 PC에 등록한 작업 노트북의 배포 키를 지정합니다. 설정 확인 후 API를 현재 사용자 서비스로 설치합니다.
 
 ```bash
-sudo install -d -m 700 -o hadoop -g hadoop /var/lib/farmhouse-controller
-sudo -u hadoop ssh-keygen -t ed25519 \
-  -f /var/lib/farmhouse-controller/id_ed25519 \
-  -C farmhouse-controller -N ''
-```
-
-공개키를 GH·GJ·GS·HA·NW 농가 PC의 `~/.ssh/authorized_keys`에 추가한 뒤 API를 설치합니다.
-
-```bash
-sudo scripts/install-controller.sh --service-user hadoop --enable-now
+scripts/install-laptop-controller.sh --enable-now
 ```
 
 로컬 API 상태:
@@ -86,14 +77,14 @@ curl http://127.0.0.1:8765/api/health
 
 ## Tailscale Serve 연결
 
-하둡 서버를 동일한 Tailnet에 연결하고 HTTPS를 활성화한 뒤 실행합니다.
+작업 노트북에서 Tailnet 전용 HTTPS를 활성화합니다.
 
 ```bash
-sudo tailscale serve --bg 8765
+tailscale serve --bg 8765
 tailscale serve status
 ```
 
-출력된 `https://...ts.net` 주소를 웹 화면 오른쪽 위 연결 설정에 입력합니다. API는 공개 Funnel이 아니라 Tailnet 전용 Serve만 사용합니다.
+현재 배포 화면에는 작업 노트북 주소 `https://aaa-h610mh.tail1dcbe4.ts.net`이 기본 설정되어 있습니다. API는 공개 Funnel이 아니라 Tailnet 전용 Serve만 사용하므로, 작업 노트북이 켜져 있고 브라우저가 동일 Tailnet에 연결된 동안만 제어할 수 있습니다.
 
 ## GitHub Pages 배포
 

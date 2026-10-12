@@ -1,0 +1,14 @@
+[Unit]
+Description=AX Farmhouse controller API on management laptop
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=@PROJECT_ROOT@
+Environment=FARMHOUSE_CONFIG=@PROJECT_ROOT@/controller/config.json
+ExecStart=@PROJECT_ROOT@/.venv/bin/uvicorn controller.app:app --host 127.0.0.1 --port 8765 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
