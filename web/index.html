@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07110d" />
+    <title>AX Farmhouse Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="AX Farmhouse 홈">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M8 36V19l16-9 16 9v17" />
+            <path d="M16 36V23h16v13M24 23v13" />
+            <circle cx="35" cy="13" r="4" />
+          </svg>
+        </span>
+        <span>
+          <strong>AX Farmhouse</strong>
+          <small>CAMERA OPERATIONS</small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <span id="apiState" class="connection-pill offline">
+          <span class="status-dot"></span>
+          API 미연결
+        </span>
+        <button id="refreshButton" class="icon-button" type="button" title="새로고침">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" />
+          </svg>
+        </button>
+        <button id="settingsButton" class="icon-button" type="button" title="연결 설정">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.7.6Z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">REGIONAL FARM NETWORK</p>
+          <h1>농가 카메라를<br /><span>한눈에, 안전하게.</span></h1>
+          <p class="hero-copy">
+            CCTV 수집 상태부터 이미지 확인, 정기 촬영과 HDFS 전송까지
+            Tailscale 내부에서 관리합니다.
+          </p>
+        </div>
+        <div class="summary-grid" aria-label="전체 운영 요약">
+          <article class="summary-card">
+            <span>온라인 농가</span>
+            <strong id="onlineCount">—</strong>
+            <small>전체 5곳</small>
+          </article>
+          <article class="summary-card">
+            <span>정상 서비스</span>
+            <strong id="serviceCount">—</strong>
+            <small>수집·촬영·업로드</small>
+          </article>
+          <article class="summary-card accent">
+            <span>업로드 대기</span>
+            <strong id="pendingCount">—</strong>
+            <small>완료 세션 기준</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block" aria-labelledby="farmsHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LIVE OVERVIEW</p>
+            <h2 id="farmsHeading">농가 운영 현황</h2>
+          </div>
+          <p id="lastUpdated" class="muted">아직 조회하지 않았습니다.</p>
+        </div>
+        <div id="farmGrid" class="farm-grid">
+          <div class="empty-card">오른쪽 위 설정에서 제어 API 주소를 연결하세요.</div>
+        </div>
+      </section>
+
+      <section id="workspace" class="workspace hidden" aria-labelledby="workspaceHeading">
+        <div class="workspace-header">
+          <div>
+            <p class="eyebrow">SELECTED FARM</p>
+            <h2 id="workspaceHeading">농가 상세 제어</h2>
+          </div>
+          <label class="select-control">
+            <span>농가 선택</span>
+            <select id="farmSelect"></select>
+          </label>
+        </div>
+
+        <div class="control-grid">
+          <article class="panel action-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-kicker">QUICK ACTIONS</span>
+                <h3>촬영 및 운영</h3>
+              </div>
+              <span id="selectedFarmState" class="mini-state">—</span>
+            </div>
+            <div class="action-list">
+              <button class="action-button primary" data-action="capture" type="button">
+                <span class="action-icon">◎</span>
+                <span><strong>즉시 작물 촬영</strong><small>CAM01~03 각 1장, 동일 세션</small></span>
+              </button>
+              <button class="action-button" data-action="upload" type="button">
+                <span class="action-icon">⇧</span>
+                <span><strong>HDFS 업로드 재시도</strong><small>완료된 미전송 세션만 처리</small></span>
+              </button>
+              <button class="action-button" data-action="check" type="button">
+                <span class="action-icon">✓</span>
+                <span><strong>운영 점검 실행</strong><small>서비스·디스크·세션 상태</small></span>
+              </button>
+              <button class="action-button danger" data-action="restart" type="button">
+                <span class="action-icon">↻</span>
+                <span><strong>수집 서비스 재시작</strong><small>문제 발생 시에만 실행</small></span>
+              </button>
+            </div>
+          </article>
+
+          <article class="panel ptz-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="panel-kicker">MANUAL PTZ</span>
+                <h3>카메라 방향 제어</h3>
+              </div>
+              <span id="ptzState" class="mini-state warning">설정 필요</span>
+            </div>
+            <div class="ptz-toolbar">
+              <select id="ptzCamera" aria-label="PTZ 카메라">
+                <option>CAM01</option><option>CAM02</option><option>CAM03</option>
+              </select>
+              <label>속도 <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.1" value="0.5" /></label>
+            </div>
+            <div class="ptz-pad" aria-label="카메라 방향 버튼">
+              <button data-direction="up" aria-label="위로">↑</button>
+              <button data-direction="left" aria-label="왼쪽으로">←</button>
+              <button class="ptz-home" data-direction="home" aria-label="홈 프리셋">⌂</button>
+              <button data-direction="right" aria-label="오른쪽으로">→</button>
+              <button data-direction="down" aria-label="아래로">↓</button>
+            </div>
+            <p class="panel-note">수동 이동 후 홈 프리셋으로 복귀해야 정기 촬영 화각이 유지됩니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="gallerySection" class="section-block hidden" aria-labelledby="galleryHeading">
+        <div class="section-heading gallery-heading">
+          <div>
+            <p class="eyebrow">IMAGE ARCHIVE</p>
+            <h2 id="galleryHeading">저장 이미지</h2>
+          </div>
+          <div class="filter-row">
+            <select id="imageType" aria-label="이미지 종류">
+              <option value="">전체 촬영</option>
+              <option value="farm_work">농작업</option>
+              <option value="crop">작물 정기 촬영</option>
+            </select>
+            <select id="imageCamera" aria-label="카메라">
+              <option value="">전체 카메라</option>
+              <option>CAM01</option><option>CAM02</option><option>CAM03</option>
+            </select>
+            <button id="loadImagesButton" class="text-button" type="button">조회</button>
+          </div>
+        </div>
+        <div id="imageGrid" class="image-grid"></div>
+        <div class="pagination">
+          <button id="previousImages" type="button">이전</button>
+          <span id="imagePage">—</span>
+          <button id="nextImages" type="button">다음</button>
+        </div>
+      </section>
+
+      <section id="logsSection" class="section-block hidden" aria-labelledby="logsHeading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">OPERATIONS LOG</p>
+            <h2 id="logsHeading">실행 결과와 로그</h2>
+          </div>
+          <div class="filter-row">
+            <select id="logUnit" aria-label="서비스 로그">
+              <option value="collect">수집 서비스</option>
+              <option value="crop">작물 촬영</option>
+              <option value="upload">HDFS 업로드</option>
+            </select>
+            <button id="loadLogsButton" class="text-button" type="button">로그 조회</button>
+          </div>
+        </div>
+        <pre id="logOutput" class="log-output">실행 결과가 여기에 표시됩니다.</pre>
+      </section>
+    </main>
+
+    <dialog id="settingsDialog" class="dialog-card">
+      <form id="settingsForm" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">CONNECTION</p><h2>제어 API 연결</h2></div>
+          <button class="close-button" value="cancel" aria-label="닫기">×</button>
+        </div>
+        <label class="field-label" for="apiUrl">Tailscale Serve HTTPS 주소</label>
+        <input id="apiUrl" type="url" placeholder="https://namenode1.example.ts.net" required />
+        <p class="field-help">주소는 이 브라우저에만 저장되며 GitHub Pages에는 전송되지 않습니다.</p>
+        <div class="dialog-actions">
+          <button class="text-button secondary" value="cancel">취소</button>
+          <button class="text-button" value="default" type="submit">저장하고 연결</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="imageDialog" class="image-dialog">
+      <button id="closeImageDialog" class="image-close" aria-label="이미지 닫기">×</button>
+      <img id="fullImage" alt="선택한 CCTV 원본 이미지" />
+      <div class="image-dialog-footer">
+        <div><strong id="fullImageTitle"></strong><small id="fullImageMeta"></small></div>
+        <a id="downloadImage" class="text-button" href="#" download>원본 다운로드</a>
+      </div>
+    </dialog>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+    <script src="./config.js"></script>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
+

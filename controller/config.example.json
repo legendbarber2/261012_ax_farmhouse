@@ -1,0 +1,57 @@
+{
+  "allowed_users": [],
+  "cors_origins": [
+    "https://legendbarber2.github.io",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080"
+  ],
+  "dev_auth": false,
+  "ssh": {
+    "identity_file": "/var/lib/farmhouse-controller/id_ed25519",
+    "connect_timeout_seconds": 8,
+    "command_timeout_seconds": 90
+  },
+  "farms": [
+    {
+      "id": "gh",
+      "name": "GH 농가",
+      "host": "100.89.226.111",
+      "user": "theimc-gh",
+      "project_dir": "/home/theimc-gh/farm-camera",
+      "ptz_enabled": false
+    },
+    {
+      "id": "gj",
+      "name": "GJ 농가",
+      "host": "100.117.126.118",
+      "user": "theimc-gj",
+      "project_dir": "/home/theimc-gj/farm-camera",
+      "ptz_enabled": false
+    },
+    {
+      "id": "gs",
+      "name": "GS 농가",
+      "host": "100.91.188.54",
+      "user": "theimc-gs",
+      "project_dir": "/home/theimc-gs/farm-camera",
+      "ptz_enabled": false
+    },
+    {
+      "id": "ha",
+      "name": "HA 농가",
+      "host": "100.126.247.97",
+      "user": "theimc-ha",
+      "project_dir": "/home/theimc-ha/farm-camera",
+      "ptz_enabled": false
+    },
+    {
+      "id": "nw",
+      "name": "NW 농가",
+      "host": "100.84.243.109",
+      "user": "theimc-nw",
+      "project_dir": "/home/theimc-nw/farm-camera",
+      "ptz_enabled": false
+    }
+  ]
+}
+
