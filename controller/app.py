@@ -232,6 +232,24 @@ def create_app(
         payload.update({"farm_id": farm.id, "limit": limit, "offset": offset})
         return payload
 
+    @app.get("/api/farms/{farm_id}/preview")
+    def preview(
+        farm_id: str,
+        camera: Literal["CAM01", "CAM02", "CAM03"],
+        user: str = Depends(require_user),
+    ) -> Response:
+        del user
+        farm = farm_or_404(farm_id)
+        try:
+            content = client.preview(farm, camera)
+        except (RemoteError, ValueError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return Response(
+            content=content,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+
     @app.get("/api/farms/{farm_id}/images/{image_id}")
     def image(
         farm_id: str,

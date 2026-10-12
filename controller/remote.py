@@ -207,6 +207,24 @@ print(json.dumps({{'total': len(items), 'items': items[{offset}:{offset + limit}
         assert isinstance(result, bytes)
         return result
 
+    def preview(self, farm: FarmSettings, camera: str) -> bytes:
+        if camera not in {"CAM01", "CAM02", "CAM03"}:
+            raise ValueError("Unsupported camera id")
+        project = self._project(farm)
+        result = self.run(
+            farm,
+            (
+                f"cd {project} && scripts/capture-camera-preview.sh "
+                f"--camera {shlex.quote(camera)}"
+            ),
+            binary=True,
+            timeout=30,
+        )
+        assert isinstance(result, bytes)
+        if not result.startswith(b"\xff\xd8") or not result.endswith(b"\xff\xd9"):
+            raise RemoteError("Camera preview did not return a valid JPEG")
+        return result
+
     def action(self, farm: FarmSettings, action: str) -> RemoteResult:
         project = self._project(farm)
         commands = {
@@ -262,4 +280,3 @@ print(json.dumps({{'total': len(items), 'items': items[{offset}:{offset + limit}
         result = self.run(farm, command, timeout=30)
         assert isinstance(result, RemoteResult)
         return result
-

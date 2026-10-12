@@ -5,6 +5,7 @@ const state = {
   imageOffset: 0,
   imageLimit: 24,
   imageTotal: 0,
+  ptzPreviewObjectUrl: null,
   refreshTimer: null,
 };
 
@@ -28,6 +29,10 @@ const elements = {
   ptzState: document.querySelector("#ptzState"),
   ptzCamera: document.querySelector("#ptzCamera"),
   ptzSpeed: document.querySelector("#ptzSpeed"),
+  ptzPreview: document.querySelector("#ptzPreview"),
+  ptzPreviewPlaceholder: document.querySelector("#ptzPreviewPlaceholder"),
+  ptzPreviewTime: document.querySelector("#ptzPreviewTime"),
+  refreshPtzPreview: document.querySelector("#refreshPtzPreview"),
   imageType: document.querySelector("#imageType"),
   imageCamera: document.querySelector("#imageCamera"),
   imageGrid: document.querySelector("#imageGrid"),
@@ -66,6 +71,20 @@ async function fetchApi(path, options = {}) {
     throw new Error(detail);
   }
   return response.json();
+}
+
+async function fetchBlob(path) {
+  if (!state.apiBaseUrl) throw new Error("제어 API 주소가 설정되지 않았습니다.");
+  const response = await fetch(apiUrl(path), { cache: "no-store" });
+  if (!response.ok) {
+    let detail = `${response.status} ${response.statusText}`;
+    try {
+      const payload = await response.json();
+      detail = payload.detail || detail;
+    } catch (_) { /* response was not JSON */ }
+    throw new Error(detail);
+  }
+  return response.blob();
 }
 
 function escapeHtml(value) {
@@ -184,6 +203,38 @@ function selectFarm(farmId) {
   });
   renderFarms();
   loadImages();
+  loadPtzPreview();
+}
+
+async function loadPtzPreview() {
+  const farm = state.farms.find((item) => item.id === state.selectedFarmId);
+  if (!farm?.online) {
+    elements.ptzPreview.classList.add("hidden");
+    elements.ptzPreviewPlaceholder.classList.remove("hidden");
+    elements.ptzPreviewPlaceholder.textContent = "농가 PC가 오프라인입니다.";
+    elements.ptzPreviewTime.textContent = "—";
+    return;
+  }
+  const camera = elements.ptzCamera.value;
+  elements.refreshPtzPreview.disabled = true;
+  elements.ptzPreviewPlaceholder.classList.remove("hidden");
+  elements.ptzPreviewPlaceholder.textContent = `${camera} 현재 화면을 불러오는 중…`;
+  try {
+    const blob = await fetchBlob(`/api/farms/${farm.id}/preview?camera=${encodeURIComponent(camera)}&_=${Date.now()}`);
+    if (state.ptzPreviewObjectUrl) URL.revokeObjectURL(state.ptzPreviewObjectUrl);
+    state.ptzPreviewObjectUrl = URL.createObjectURL(blob);
+    elements.ptzPreview.src = state.ptzPreviewObjectUrl;
+    elements.ptzPreview.classList.remove("hidden");
+    elements.ptzPreviewPlaceholder.classList.add("hidden");
+    elements.ptzPreviewTime.textContent = `${camera} · ${dateTime(new Date().toISOString())} 갱신`;
+  } catch (error) {
+    elements.ptzPreview.classList.add("hidden");
+    elements.ptzPreviewPlaceholder.classList.remove("hidden");
+    elements.ptzPreviewPlaceholder.textContent = `화면 조회 실패: ${error.message}`;
+    elements.ptzPreviewTime.textContent = "—";
+  } finally {
+    elements.refreshPtzPreview.disabled = false;
+  }
 }
 
 async function loadDashboard({ quiet = false } = {}) {
@@ -333,6 +384,7 @@ async function moveCamera(direction) {
     });
     const result = await waitForJob(job.id);
     if (result.status !== "succeeded") throw new Error(result.error);
+    window.setTimeout(loadPtzPreview, 500);
   } catch (error) {
     toast(`카메라 제어 실패: ${error.message}`, "error");
   }
@@ -358,6 +410,8 @@ elements.refreshButton.addEventListener("click", () => loadDashboard());
 elements.farmSelect.addEventListener("change", () => selectFarm(elements.farmSelect.value));
 document.querySelectorAll("[data-action]").forEach((button) => button.addEventListener("click", () => runAction(button.dataset.action)));
 document.querySelectorAll(".ptz-pad button").forEach((button) => button.addEventListener("click", () => moveCamera(button.dataset.direction)));
+elements.ptzCamera.addEventListener("change", loadPtzPreview);
+elements.refreshPtzPreview.addEventListener("click", loadPtzPreview);
 elements.loadImagesButton.addEventListener("click", () => { state.imageOffset = 0; loadImages(); });
 elements.previousImages.addEventListener("click", () => { state.imageOffset = Math.max(0, state.imageOffset - state.imageLimit); loadImages(); });
 elements.nextImages.addEventListener("click", () => { state.imageOffset += state.imageLimit; loadImages(); });

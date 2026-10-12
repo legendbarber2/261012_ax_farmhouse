@@ -137,20 +137,35 @@
               </div>
               <span id="ptzState" class="mini-state warning">설정 필요</span>
             </div>
-            <div class="ptz-toolbar">
-              <select id="ptzCamera" aria-label="PTZ 카메라">
-                <option>CAM01</option><option>CAM02</option><option>CAM03</option>
-              </select>
-              <label>속도 <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.1" value="0.5" /></label>
+            <div class="ptz-layout">
+              <div class="ptz-preview-column">
+                <div class="ptz-preview-frame">
+                  <img id="ptzPreview" alt="선택한 카메라 현재 화면" class="hidden" />
+                  <div id="ptzPreviewPlaceholder" class="ptz-preview-placeholder">카메라 화면을 불러오세요.</div>
+                  <span id="ptzPreviewBadge" class="ptz-preview-badge">현재 화면</span>
+                </div>
+                <div class="ptz-preview-footer">
+                  <span id="ptzPreviewTime">—</span>
+                  <button id="refreshPtzPreview" class="text-button secondary" type="button">화면 새로고침</button>
+                </div>
+              </div>
+              <div class="ptz-controls">
+                <div class="ptz-toolbar">
+                  <select id="ptzCamera" aria-label="PTZ 카메라">
+                    <option>CAM01</option><option>CAM02</option><option>CAM03</option>
+                  </select>
+                  <label>속도 <input id="ptzSpeed" type="range" min="0.1" max="1" step="0.1" value="0.5" /></label>
+                </div>
+                <div class="ptz-pad" aria-label="카메라 방향 버튼">
+                  <button data-direction="up" aria-label="위로">↑</button>
+                  <button data-direction="left" aria-label="왼쪽으로">←</button>
+                  <button class="ptz-home" data-direction="home" aria-label="홈 프리셋">⌂</button>
+                  <button data-direction="right" aria-label="오른쪽으로">→</button>
+                  <button data-direction="down" aria-label="아래로">↓</button>
+                </div>
+                <p class="panel-note">수동 이동 후 홈 프리셋으로 복귀해야 정기 촬영 화각이 유지됩니다.</p>
+              </div>
             </div>
-            <div class="ptz-pad" aria-label="카메라 방향 버튼">
-              <button data-direction="up" aria-label="위로">↑</button>
-              <button data-direction="left" aria-label="왼쪽으로">←</button>
-              <button class="ptz-home" data-direction="home" aria-label="홈 프리셋">⌂</button>
-              <button data-direction="right" aria-label="오른쪽으로">→</button>
-              <button data-direction="down" aria-label="아래로">↓</button>
-            </div>
-            <p class="panel-note">수동 이동 후 홈 프리셋으로 복귀해야 정기 촬영 화각이 유지됩니다.</p>
           </article>
         </div>
       </section>
@@ -232,4 +247,3 @@
     <script src="./app.js" defer></script>
   </body>
 </html>
-

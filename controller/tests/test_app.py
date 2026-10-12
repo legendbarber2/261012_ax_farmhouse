@@ -18,6 +18,9 @@ class FakeRemote:
     def list_images(self, farm, **kwargs):
         return {"total": 0, "items": []}
 
+    def preview(self, farm, camera):
+        return b"\xff\xd8preview\xff\xd9"
+
     def action(self, farm, action):
         return RemoteResult(stdout=f"{farm.id}:{action}", stderr="", returncode=0)
 
@@ -55,3 +58,11 @@ def test_unknown_farm_is_404():
     response = client.get("/api/farms/unknown/status")
     assert response.status_code == 404
 
+
+def test_camera_preview_returns_uncached_jpeg():
+    client = TestClient(create_app(settings(), FakeRemote()))
+    response = client.get("/api/farms/ha/preview?camera=CAM02")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.content == b"\xff\xd8preview\xff\xd9"
