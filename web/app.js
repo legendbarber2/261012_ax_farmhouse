@@ -8,6 +8,7 @@ const state = {
   currentSessions: [],
   sessionImages: new Map(),
   ptzPreviewObjectUrl: null,
+  ptzPreviewRequestId: 0,
   refreshTimer: null,
 };
 
@@ -221,12 +222,19 @@ function selectFarm(farmId) {
 }
 
 async function loadPtzPreview() {
+  const requestId = ++state.ptzPreviewRequestId;
   const farm = state.farms.find((item) => item.id === state.selectedFarmId);
+  if (state.ptzPreviewObjectUrl) {
+    URL.revokeObjectURL(state.ptzPreviewObjectUrl);
+    state.ptzPreviewObjectUrl = null;
+  }
+  elements.ptzPreview.removeAttribute("src");
+  elements.ptzPreview.classList.add("hidden");
+  elements.ptzPreviewPlaceholder.classList.remove("hidden");
   if (!farm?.online) {
-    elements.ptzPreview.classList.add("hidden");
-    elements.ptzPreviewPlaceholder.classList.remove("hidden");
     elements.ptzPreviewPlaceholder.textContent = "농가 PC가 오프라인입니다.";
     elements.ptzPreviewTime.textContent = "—";
+    elements.refreshPtzPreview.disabled = false;
     return;
   }
   const camera = elements.ptzCamera.value;
@@ -235,19 +243,24 @@ async function loadPtzPreview() {
   elements.ptzPreviewPlaceholder.textContent = `${camera} 현재 화면을 불러오는 중…`;
   try {
     const blob = await fetchBlob(`/api/farms/${farm.id}/preview?camera=${encodeURIComponent(camera)}&_=${Date.now()}`);
-    if (state.ptzPreviewObjectUrl) URL.revokeObjectURL(state.ptzPreviewObjectUrl);
+    if (
+      requestId !== state.ptzPreviewRequestId
+      || state.selectedFarmId !== farm.id
+      || elements.ptzCamera.value !== camera
+    ) return;
     state.ptzPreviewObjectUrl = URL.createObjectURL(blob);
     elements.ptzPreview.src = state.ptzPreviewObjectUrl;
     elements.ptzPreview.classList.remove("hidden");
     elements.ptzPreviewPlaceholder.classList.add("hidden");
     elements.ptzPreviewTime.textContent = `${camera} · ${dateTime(new Date().toISOString())} 갱신`;
   } catch (error) {
-    elements.ptzPreview.classList.add("hidden");
-    elements.ptzPreviewPlaceholder.classList.remove("hidden");
+    if (requestId !== state.ptzPreviewRequestId) return;
     elements.ptzPreviewPlaceholder.textContent = `화면 조회 실패: ${error.message}`;
     elements.ptzPreviewTime.textContent = "—";
   } finally {
-    elements.refreshPtzPreview.disabled = false;
+    if (requestId === state.ptzPreviewRequestId) {
+      elements.refreshPtzPreview.disabled = false;
+    }
   }
 }
 
